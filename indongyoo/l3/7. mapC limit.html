@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+  <script src="functional.js"></script>
+</head>
+<body>
+
+<script>
+  function time(a) {
+    return new Promise(resolve => {
+      setTimeout(function() {
+        resolve(a);
+      }, 1000);
+    })
+  }
+
+  go(mapC(a => time(a * 2), [1,2,3,4], 2), log);
+
+  go(mapC(a => time(a * 2), {a:1,b:2,c:3,d:4}, 2), log);
+</script>
+
+</body>
+</html>

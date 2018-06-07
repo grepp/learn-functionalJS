@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+  <script src="functional.js"></script>
+</head>
+<body>
+
+# try catch
+
+<script>
+  /*function a() {
+    throw 'err~~';
+  }
+
+  function test() {
+    try {
+      return JSON.parse('{');
+    } catch (e) {
+      log(e, '핸들링함');
+    } finally {
+      log('finally');
+    }
+  }
+
+  log(test(), 'log~');*/
+</script>
+
+# 비동기 에러는 try catch만으로는 잡을 수 없다.
+
+<script>
+  /*function setT(f) {
+    return f();
+  }
+
+  function test() {
+    try {
+      setTimeout(function() {
+        try {
+          JSON.parse('{')
+        } catch (e) {
+          log(e, '안쪽 핸들링함');
+        }
+      }, 10);
+    } catch (e) {
+      log(e, '핸들링함');
+    } finally {
+      log('finally');
+    }
+  }
+
+  log(test(), 'log~');*/
+</script>
+
+
+# Promise.reject .catch
+
+<script>
+  /*function test() {
+    return new Promise((resolve, reject) => {
+      setTimeout(function() {
+        try {
+          resolve(JSON.parse('{'));
+        } catch (e) {
+          reject(e);
+        }
+      }, 10)
+    });
+  }
+
+  /!*test()
+    .then(function(obj) {
+      log('정상 동작함', obj)
+    })
+    .catch(function(e) {
+      log('에러남', e);
+    });
+
+  test()
+    .then(function(obj) {
+      log('정상 동작함', obj)
+    }, function(e) {
+      log('에러남', e);
+    });*!/
+
+  async function a() {
+    try {
+      log(await test());
+      // log(await Promise.reject('~~~~'));
+    } catch (e) {
+      log(e, '핸들링함~~');
+    }
+  }
+
+  a();*/
+</script>
+
+# async/await가 비동기 제어와 에러 핸들링에 있어 충분할까?
+
+<script>
+  /*async function getTimes(list) {
+    return await map(async function(v) {
+      return await new Promise(function(resolve) {
+        setTimeout(function() {
+          resolve([v, new Date()]);
+        }, v * 1000);
+      });
+    }, list);
+  }
+
+  (async function () {
+    go(await getTimes([1, 2, 3]), log);
+  })()*/
+
+  /*function getTimes(list) {
+    try {
+      return list.filter(function(v) {
+        asdasasd;
+      });
+/!*      return await map(async function(v) {
+        return await new Promise(function(resolve, reject) {
+          setTimeout(function() {
+            try {
+              asdasda;
+              resolve([v, new Date()]);
+            } catch (e) {
+              reject(e);
+            }
+          }, v * 1000);
+        });
+      }, list);*!/
+    } catch (e) {
+      log('에러를 잡음', e);
+    }
+  }
+  getTimes([1, 2, 3]);*/
+</script>
+
+# tryCatch
+
+<script>
+  function tryCatch(tryF, args, catchF) {
+    try {
+      var res = tryF(...args);
+      return res instanceof Promise ? res.catch(catchF) : res;
+    } catch (e) {
+      return catchF(e);
+    }
+  }
+
+  /*go(
+    tryCatch(
+      JSON.parse, ['{"a: 1}'],
+      e => (log(e, 'catch!'), '실패!!')),
+    log);
+
+  go(
+    tryCatch(
+      json => new Promise((resolve, reject) => {
+        setTimeout(function() {
+          try {
+            resolve(JSON.parse(json));
+          } catch (e) {
+            reject(e);
+          }
+        }, 10)
+      }), ['{"a: 1}'],
+      e => (log(e, 'catch!'), '실패!!')),
+    log);*/
+</script>
+
+# reduceB, Break
+
+<script type="module">
+class Break {
+  constructor(value) { this.value = value; }
+  static of(value) { return new Break(value); }
+}
+
+const reduceB = curry(function(f, coll, acc) {
+  const iter = collIter(coll);
+  return go(
+    arguments.length == 2 ? iter.next().value : acc,
+    function recur(acc) {
+      var cur;
+      while (!(cur = iter.next()).done && !(acc instanceof Break))
+        if ((acc = f(acc, cur.value, Break.of)) instanceof Promise)
+          return acc.then(recur);
+      return acc instanceof Break ? acc.value : acc;
+    });
+});
+
+/*go(
+  reduceB((a, b) => b > 4 ? Promise.resolve(Break.of(a)) : a + b, [1, 2, 3, 4, 5, 6]),
+  log
+);*/
+</script>
+
+# pipeT().catch(), pipeT().finally()
+
+<script>
+function pipeT(f, ...fs) {
+  var catchF = tap(console.error), finallyF = identity, interceptors = [];
+
+  const hook = (f, args) => go(
+    find(itc => itc.predi(...args), interceptors),
+    itc => itc ?
+      Break.of(itc.body(...args)) :
+      tryCatch(f, args, e => Break.of(catchF(e))));
+
+  fs.push(identity);
+  return Object.assign((...args) => go(
+    reduceB((arg, f) => hook(f, [arg]), fs, hook(f, args)),
+    finallyF
+  ), {
+    catch(...fs) {
+      catchF = pipe(...fs);
+      return this;
+    },
+    finally(...fs) {
+      finallyF = pipe(...fs);
+      return this;
+    },
+    addInterceptor(...fs) {
+      var itc = { predi: pipe(...fs) };
+      return (...fs) => {
+        itc.body = pipe(...fs);
+        interceptors.push(itc);
+        return this;
+      }
+    }
+  })
+}
+
+var f1 = pipeT(
+  a => {
+    log('f - 1');
+    return a + 10;
+  },
+  a => {
+    log('f - 2');
+    return new Promise((resolve, reject) => {
+      // reject('~~~~~~~~');
+      resolve(a + 5);
+    });
+    // return a + 5;
+  },
+  a => {
+    log('f - 3');
+    return a + 5;
+  }
+).catch(
+  e => log(e, 'catch!'),
+  _ => -1
+).finally(
+  a => (log(a, 'finally'), a + 5),
+);
+
+// go(10, f1, log);
+</script>
+
+# pipeT().addInterceptor()()
+
+<script>
+var f2 = pipeT(
+  a => {
+    log('f - 1');
+    return Promise.reject(new Error('hi~~'));
+  },
+  a => {
+    log('f - 2');
+    return a - 5;
+  },
+).addInterceptor(isUndefined) (
+  a => (log(a, '인터'), 'hi')
+).catch(
+  e => 'catched~'
+).finally(
+  e => log(e, 'finally')
+);
+
+// f2();
+// f2(10);
+</script>
+
+# 안전한 합성, 그리고 동기/비동기를 함께 지원하는 함수를 만들어야하는 이유
+
+<script>
+var f3 = pipeT(
+  // JSON.parse,
+  map(u => Promise.resolve(u.age)),
+  reduce((a, b) => a + b)
+).addInterceptor(a => a.length == 0) (
+  _ => 0
+).finally(
+  log
+);
+
+// f3('[{"age": 30}, {"age": 20}]');
+// f3('[{"age": 30}, {"age": 20}, {"age": 30}]');
+
+// f3([{"age": 30}, {"age": 20}, {"age": 30}]);
+f3([]);
+
+</script>
+
+# 정리
+
+pipeT는 기본적으로는 동기/비동기 상황의 함수 합성을 처리해주는 함수입니다. 여기서
+pipeT가 동기와 비동기를 구분 짓는 규칙은 ES6+의 내장 값인 Promise를 기준으로 합니다.
+catch를 통해 자바스크립트의 동기/비동기에서의 기본 에러 상황을 다루며,
+에러가 있을 때의 함수 함성 규칙을 만들 수 있습니다. 또한 addInterceptor를 통해
+또다른 예외 상황을 대응하는 함수 합성 규칙도 세울 수 있습니다. 이것을 통해 자바스크립트의
+내장 값만을 이용해서도 안전한 함수 함성을 할 수 있도록 합니다.
+
+자바스크립트는 동적 언어이자 인터프리터 언어입니다. prototype 기반으로
+다양한 사용자 정의 클래스를 만들 수 있지만 인터프리터 언어의 특성상 타입을 강하게
+지원하지 못합니다. 메서드나 함수가 처리되는 과정에서 타입을 파악하기 때문에 안전한 조합을
+보장하기 어렵습니다. 복잡한 타입들을 도입하거나 많은 수의 사용자 정의 클래스를 만들게 되면
+IDE의 지원을 받아도 너무나 복잡한 세상들의 조합을 네비게이션하기조차 힘들어지기도 합니다.
+
+그렇다면 자바스크립트는 안전할 수 없는 걸까요? 사용자 정의 클래스를 만들지 않고
+자바스크립트의 기본 값들을 기준으로 프로그래밍을 하게되면 안전하게 프로그래밍이 가능합니다.
+서로 다른 세상을 살펴볼 필요도 없습니다. 어떤 함수든 기본 값을 리턴하기 때문에 그 기본 값을
+잘 다루는 함수들을 조합하면서 안전하게 프로그래밍 해나갈 수 있습니다.
+
+</body>
+</html>
