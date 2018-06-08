@@ -1,1 +1,2 @@
-# learn-functionalJS
+# ES6로 알아보는 동시성 & 함수형 프로그래밍
+
