@@ -1,4 +1,4 @@
-!function() {
+!function(Root) {
   const identity = a => a;
 
   const call = (f, arg) => f(arg);
@@ -260,10 +260,14 @@
   function baseMatch(targets) {
     var cbs = [];
 
-    function _evl() {
-      return go(cbs,
-        find(pb => { return pb._case(...targets); }),
-        pb => pb._body(...targets))
+    function evl() {
+      return go(
+        targets,
+        values,
+        targets =>
+          go(cbs,
+            find(pb => { return pb._case(...targets); }),
+            pb => pb._body(...targets)));
     }
 
     function _case(f) {
@@ -279,7 +283,7 @@
 
     _case.else = function() {
       _case(_=> true) (...arguments);
-      return targets ? _evl() : (...targets2) => ((targets = targets2), _evl());
+      return targets ? evl() : (...targets2) => ((targets = targets2), evl());
     };
 
     return _case;
@@ -331,7 +335,12 @@
 
   const first = arr => arr[0];
 
-  var Functional = {
+  const nodeF = f => (..._) =>
+    new Promise((resolve, reject) =>
+      f(..._, (err, val) => err ? reject(err) : resolve(val)
+    ));
+
+  Root.Functional = {
     identity, not, negate,
     isUndefined, hasIter, isArray,
     isMatch,
@@ -354,7 +363,7 @@
     series, concurrency,
     match, or, and,
     baseSel, sel,
-    first
+    first,
+    nodeF
   };
-  window.Functional = Functional;
-} ();
+} (typeof window != 'undefined' ? window : global);
