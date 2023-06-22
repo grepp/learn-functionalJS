@@ -9,6 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "pg": "^7.4.3"
+    "pg": "^8.11.0"
   }
 }
